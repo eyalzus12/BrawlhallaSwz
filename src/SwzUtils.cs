@@ -8,8 +8,6 @@ namespace BrawlhallaSwz;
 
 public static partial class SwzUtils
 {
-    internal const uint CHECKSUM_XOR = 0x2DF4A1CD;
-
     internal static byte[] CompressBuffer(byte[] buffer)
     {
         using MemoryStream bufferStream = new(buffer);
@@ -54,7 +52,7 @@ public static partial class SwzUtils
 
     internal static uint CalculateKeyChecksum(uint key, SwzRandom rand)
     {
-        uint checksum = CHECKSUM_XOR;
+        uint checksum = 0x2DF4A1CD;
         uint hashRounds = key % 31 + 5;
         for (int i = 0; i < hashRounds; ++i)
         {
