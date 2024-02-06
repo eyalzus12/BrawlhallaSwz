@@ -19,7 +19,7 @@ public class SwzReader : IDisposable
         uint calculatedChecksum = SwzUtils.CalculateKeyChecksum(key, _random);
         if (calculatedChecksum != checksum)
         {
-            throw new SwzChecksumException("Key checksum check failed");
+            throw new SwzChecksumException($"Key checksum check failed. Expected {checksum} but got {calculatedChecksum}");
         }
     }
 
@@ -32,7 +32,7 @@ public class SwzReader : IDisposable
         SwzUtils.DecryptBuffer(compressedBuffer, _random, out uint calculatedChecksum);
         if (calculatedChecksum != checksum)
         {
-            throw new SwzChecksumException("File checksum check failed");
+            throw new SwzChecksumException($"File checksum check failed. Expected {checksum} but got {calculatedChecksum}");
         }
         byte[] buffer = SwzUtils.DecompressBuffer(compressedBuffer);
         if (buffer.Length != decompressedSize)
