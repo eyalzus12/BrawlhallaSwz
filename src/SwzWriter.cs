@@ -21,15 +21,15 @@ public class SwzWriter : IDisposable
 
     public void WriteFile(string content)
     {
-        byte[] contentBuffer = Encoding.UTF8.GetBytes(content);
-        uint decompressedSize = (uint)contentBuffer.Length ^ _random.Next();
-        byte[] buffer = SwzUtils.CompressBuffer(contentBuffer);
-        uint compressedSize = (uint)buffer.Length ^ _random.Next();
+        byte[] buffer = Encoding.UTF8.GetBytes(content);
+        uint decompressedSize = (uint)buffer.Length ^ _random.Next();
+        byte[] compressedBuffer = SwzUtils.CompressBuffer(buffer);
+        uint compressedSize = (uint)compressedBuffer.Length ^ _random.Next();
         _stream.WriteBigEndian(compressedSize);
         _stream.WriteBigEndian(decompressedSize);
-        SwzUtils.EncryptBuffer(buffer, _random, out uint checksum);
+        SwzUtils.EncryptBuffer(compressedBuffer, _random, out uint checksum);
         _stream.WriteBigEndian(checksum);
-        _stream.WriteBuffer(buffer);
+        _stream.WriteBuffer(compressedBuffer);
     }
 
     public void Flush()

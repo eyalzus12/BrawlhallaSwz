@@ -28,18 +28,18 @@ public class SwzReader : IDisposable
         uint compressedSize = _stream.ReadBigEndian<uint>() ^ _random.Next();
         uint decompressedSize = _stream.ReadBigEndian<uint>() ^ _random.Next();
         uint checksum = _stream.ReadBigEndian<uint>();
-        byte[] buffer = _stream.ReadBuffer((int)compressedSize);
-        SwzUtils.DecryptBuffer(buffer, _random, out uint calculatedChecksum);
+        byte[] compressedBuffer = _stream.ReadBuffer((int)compressedSize);
+        SwzUtils.DecryptBuffer(compressedBuffer, _random, out uint calculatedChecksum);
         if (calculatedChecksum != checksum)
         {
             throw new SwzChecksumException("File checksum check failed");
         }
-        byte[] contentBytes = SwzUtils.DecompressBuffer(buffer);
-        if (contentBytes.Length != decompressedSize)
+        byte[] buffer = SwzUtils.DecompressBuffer(compressedBuffer);
+        if (buffer.Length != decompressedSize)
         {
-            throw new SwzFileSizeException($"Expected file size to be {decompressedSize}, but file size is {contentBytes.Length}");
+            throw new SwzFileSizeException($"Expected file size to be {decompressedSize}, but file size is {buffer.Length}");
         }
-        string content = Encoding.UTF8.GetString(contentBytes);
+        string content = Encoding.UTF8.GetString(buffer);
         return content;
     }
 
