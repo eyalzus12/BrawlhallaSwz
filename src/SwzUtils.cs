@@ -13,15 +13,17 @@ public static partial class SwzUtils
         using MemoryStream bufferStream = new(buffer);
         using ZLibStream zlibStream = new(bufferStream, CompressionMode.Compress);
         using MemoryStream compressedStream = new(); zlibStream.CopyTo(compressedStream);
-        return compressedStream.ToArray();
+        byte[] compressedBuffer = compressedStream.ToArray();
+        return compressedBuffer;
     }
 
-    internal static byte[] DecompressBuffer(byte[] buffer)
+    internal static byte[] DecompressBuffer(byte[] compressedBuffer)
     {
-        using MemoryStream bufferStream = new(buffer);
-        using ZLibStream zlibStream = new(bufferStream, CompressionMode.Decompress);
-        using MemoryStream contentStream = new(); zlibStream.CopyTo(contentStream);
-        return contentStream.ToArray();
+        using MemoryStream compressedStream = new(compressedBuffer);
+        using ZLibStream zlibStream = new(compressedStream, CompressionMode.Decompress);
+        using MemoryStream bufferStream = new(); zlibStream.CopyTo(bufferStream);
+        byte[] buffer = bufferStream.ToArray();
+        return buffer;
     }
 
     internal static T ReadBigEndian<T>(this Stream stream) where T : unmanaged, IBinaryInteger<T>
