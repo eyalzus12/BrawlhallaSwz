@@ -69,7 +69,7 @@ public static partial class SwzUtils
         for (int i = 0; i < buffer.Length; ++i)
         {
             checksum = buffer[i] ^ BitOperations.RotateRight(checksum, i % 7 + 1);
-            buffer[i] ^= (byte)(rand.Next() >> i % 15);
+            buffer[i] ^= (byte)(rand.Next() >> (i % 15));
         }
     }
 
@@ -78,7 +78,7 @@ public static partial class SwzUtils
         checksum = rand.Next();
         for (int i = 0; i < buffer.Length; ++i)
         {
-            buffer[i] ^= (byte)(rand.Next() >> i % 15);
+            buffer[i] ^= (byte)(rand.Next() >> (i % 15));
             checksum = buffer[i] ^ BitOperations.RotateRight(checksum, i % 7 + 1);
         }
     }
