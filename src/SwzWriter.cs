@@ -9,10 +9,9 @@ public class SwzWriter : IDisposable
     private readonly Stream _stream;
     private readonly SwzRandom _random;
 
-    public SwzWriter(Stream stream, uint key)
+    public SwzWriter(Stream stream, uint key, uint seed = 0)
     {
         _stream = stream;
-        uint seed = (uint)Random.Shared.Next();
         _random = new(key ^ seed);
         uint checksum = SwzUtils.CalculateKeyChecksum(key, _random);
         _stream.WriteBigEndian(checksum);
