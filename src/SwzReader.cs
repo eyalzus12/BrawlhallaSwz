@@ -17,10 +17,7 @@ public class SwzReader : IDisposable
         uint seed = _stream.ReadBigEndian<uint>();
         _random = new(seed ^ key);
         uint calculatedChecksum = SwzUtils.CalculateKeyChecksum(key, _random);
-        if (calculatedChecksum != checksum)
-        {
-            throw new SwzChecksumException($"Key checksum check failed. Expected {checksum} but got {calculatedChecksum}");
-        }
+        if (calculatedChecksum != checksum) throw new SwzChecksumException($"Key checksum check failed. Expected {checksum} but got {calculatedChecksum}");
     }
 
     public string ReadFile()
@@ -30,31 +27,16 @@ public class SwzReader : IDisposable
         uint checksum = _stream.ReadBigEndian<uint>();
         byte[] compressedBuffer = _stream.ReadBuffer((int)compressedSize);
         SwzUtils.DecryptBuffer(compressedBuffer, _random, out uint calculatedChecksum);
-        if (calculatedChecksum != checksum)
-        {
-            throw new SwzChecksumException($"File checksum check failed. Expected {checksum} but got {calculatedChecksum}");
-        }
+        if (calculatedChecksum != checksum) throw new SwzChecksumException($"File checksum check failed. Expected {checksum} but got {calculatedChecksum}");
         byte[] buffer = SwzUtils.DecompressBuffer(compressedBuffer);
-        if (buffer.Length != decompressedSize)
-        {
-            throw new SwzFileSizeException($"Expected file size to be {decompressedSize}, but file size is {buffer.Length}");
-        }
+        if (buffer.Length != decompressedSize) throw new SwzFileSizeException($"Expected file size to be {decompressedSize}, but file size is {buffer.Length}");
         string content = Encoding.UTF8.GetString(buffer);
         return content;
     }
 
-    public bool TryReadFile([NotNullWhen(true)] out string? content)
+    public bool HasNext()
     {
-        if (_stream.Position >= _stream.Length)
-        {
-            content = null;
-            return false;
-        }
-        else
-        {
-            content = ReadFile();
-            return true;
-        }
+        return _stream.Position < _stream.Length;
     }
 
     public void Flush()
