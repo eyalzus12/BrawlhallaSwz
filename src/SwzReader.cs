@@ -57,6 +57,11 @@ public class SwzReader : IDisposable
         }
     }
 
+    public void Flush()
+    {
+        _stream.Flush();
+    }
+
     public void Dispose()
     {
         Dispose(true);

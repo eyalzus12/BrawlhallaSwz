@@ -32,6 +32,11 @@ public class SwzWriter : IDisposable
         _stream.WriteBuffer(buffer);
     }
 
+    public void Flush()
+    {
+        _stream.Flush();
+    }
+
     public void Dispose()
     {
         Dispose(true);
