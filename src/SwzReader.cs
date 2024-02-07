@@ -49,12 +49,18 @@ public class SwzReader : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    private bool disposed = false;
+
     protected virtual void Dispose(bool disposing)
     {
-        if (disposing)
+        if (!disposed)
         {
-            _stream.Dispose();
+            if (disposing)
+            {
+                _stream.Dispose();
+            }
         }
+        disposed = true;
     }
 
     ~SwzReader()
