@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BrawlhallaSwz.Tests", "BrawlhallaSwz.Tests\BrawlhallaSwz.Tests.csproj", "{988382AA-9657-412B-BC2E-E40627922454}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BrawlhallaSwz", "BrawlhallaSwz\BrawlhallaSwz.csproj", "{34C8B8D0-A4B6-469D-9F3C-EC60A23D4B7F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{988382AA-9657-412B-BC2E-E40627922454}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{988382AA-9657-412B-BC2E-E40627922454}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{988382AA-9657-412B-BC2E-E40627922454}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{988382AA-9657-412B-BC2E-E40627922454}.Release|Any CPU.Build.0 = Release|Any CPU
+		{34C8B8D0-A4B6-469D-9F3C-EC60A23D4B7F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{34C8B8D0-A4B6-469D-9F3C-EC60A23D4B7F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{34C8B8D0-A4B6-469D-9F3C-EC60A23D4B7F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{34C8B8D0-A4B6-469D-9F3C-EC60A23D4B7F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
