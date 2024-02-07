@@ -4,7 +4,7 @@ using System.Text;
 
 namespace BrawlhallaSwz;
 
-public class SwzReader : IDisposable
+public class SwzReader : MarshalByRefObject, IDisposable
 {
     private readonly Stream _stream;
     private readonly SwzRandom _random;
