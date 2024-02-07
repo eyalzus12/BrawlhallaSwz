@@ -91,13 +91,13 @@ public static partial class SwzUtils
     {
         //LevelDesc
         Match levelDescMatch = LevelDescRegex.Match(content);
-        if (levelDescMatch.Success) return levelDescMatch.Captures[0].Value;
+        if (levelDescMatch.Success) return levelDescMatch.Captures[0].Value + ".xml";
         //xml
         Match xmlMatch = XmlRegex.Match(content);
-        if (xmlMatch.Success) return xmlMatch.Captures[0].Value;
+        if (xmlMatch.Success) return xmlMatch.Captures[0].Value + ".xml";
         //csv
         Match csvMatch = CsvRegex.Match(content);
-        if (csvMatch.Success) return csvMatch.Captures[0].Value;
+        if (csvMatch.Success) return csvMatch.Captures[0].Value + ".csv";
         throw new SwzFileNameException("Could not find file name from file content as it does not match any known format");
     }
 
