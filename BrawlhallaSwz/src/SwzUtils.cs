@@ -10,18 +10,28 @@ public static partial class SwzUtils
 {
     internal static byte[] CompressBuffer(byte[] buffer)
     {
-        using MemoryStream bufferStream = new(buffer);
-        using ZLibStream zlibStream = new(bufferStream, CompressionMode.Compress);
-        using MemoryStream compressedStream = new(); zlibStream.CopyTo(compressedStream);
+        // create compressor
+        using MemoryStream compressedStream = new();
+        using (ZLibStream zlibStream = new(compressedStream, CompressionLevel.SmallestSize))
+        {
+            // write buffer into compressor
+            using MemoryStream bufferStream = new(buffer);
+            bufferStream.CopyTo(zlibStream);
+        }
+        // get compressed buffer
         byte[] compressedBuffer = compressedStream.ToArray();
         return compressedBuffer;
     }
 
     internal static byte[] DecompressBuffer(byte[] compressedBuffer)
     {
+        // create decompressor
         using MemoryStream compressedStream = new(compressedBuffer);
         using ZLibStream zlibStream = new(compressedStream, CompressionMode.Decompress);
-        using MemoryStream bufferStream = new(); zlibStream.CopyTo(bufferStream);
+        // extract decompressed buffer
+        using MemoryStream bufferStream = new();
+        zlibStream.CopyTo(bufferStream);
+        // get decompressed buffer
         byte[] buffer = bufferStream.ToArray();
         return buffer;
     }
@@ -54,32 +64,30 @@ public static partial class SwzUtils
 
     internal static uint CalculateKeyChecksum(uint key, SwzRandom rand)
     {
-        uint checksum = 0x2DF4A1CD;
-        uint hashRounds = key % 31 + 5;
-        for (int i = 0; i < hashRounds; ++i)
+        uint checksum = 0x2DF4A1CDu;
+        uint rounds = key % 31 + 5;
+        for (uint i = 0; i < rounds; ++i)
         {
             checksum ^= rand.Next();
         }
         return checksum;
     }
 
-    internal static void EncryptBuffer(byte[] buffer, SwzRandom rand, out uint checksum)
+    internal static uint CalculateBufferChecksum(byte[] buffer, uint checksumInit)
     {
-        checksum = rand.Next();
+        uint checksum = checksumInit;
         for (int i = 0; i < buffer.Length; ++i)
         {
             checksum = buffer[i] ^ BitOperations.RotateRight(checksum, i % 7 + 1);
-            buffer[i] ^= (byte)(rand.Next() >> (i % 15));
         }
+        return checksum;
     }
 
-    internal static void DecryptBuffer(byte[] buffer, SwzRandom rand, out uint checksum)
+    internal static void CipherBuffer(byte[] buffer, SwzRandom rand)
     {
-        checksum = rand.Next();
         for (int i = 0; i < buffer.Length; ++i)
         {
-            buffer[i] ^= (byte)(rand.Next() >> (i % 15));
-            checksum = buffer[i] ^ BitOperations.RotateRight(checksum, i % 7 + 1);
+            buffer[i] ^= (byte)(rand.Next() >> (i % 16));
         }
     }
 
@@ -89,15 +97,15 @@ public static partial class SwzUtils
 
     public static string GetFileName(string content)
     {
-        //LevelDesc
+        // LevelDesc
         Match levelDescMatch = LevelDescRegex.Match(content);
-        if (levelDescMatch.Success) return levelDescMatch.Captures[0].Value + ".xml";
-        //xml
+        if (levelDescMatch.Success) return levelDescMatch.Groups[1].Value + ".xml";
+        // xml
         Match xmlMatch = XmlRegex.Match(content);
-        if (xmlMatch.Success) return xmlMatch.Captures[0].Value + ".xml";
-        //csv
+        if (xmlMatch.Success) return xmlMatch.Groups[1].Value + ".xml";
+        // csv
         Match csvMatch = CsvRegex.Match(content);
-        if (csvMatch.Success) return csvMatch.Captures[0].Value + ".csv";
+        if (csvMatch.Success) return csvMatch.Groups[1].Value + ".csv";
         throw new SwzFileNameException("Could not find file name from file content as it does not match any known format");
     }
 
@@ -106,6 +114,6 @@ public static partial class SwzUtils
 
     [GeneratedRegex(@"^<(\w+)>", RegexOptions.Compiled)]
     private static partial Regex XmlRegexGenerator();
-    [GeneratedRegex(@"^(\w+)$", RegexOptions.Compiled)]
+    [GeneratedRegex(@"^(\w+)\n", RegexOptions.Compiled)]
     private static partial Regex CsvRegexGenerator();
 }

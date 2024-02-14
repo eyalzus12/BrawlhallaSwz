@@ -12,6 +12,7 @@ public class SwzReader : MarshalByRefObject, IDisposable
     public SwzReader(Stream stream, uint key)
     {
         _stream = stream;
+        _stream.Position = 0;
         uint checksum = _stream.ReadBigEndian<uint>();
         uint seed = _stream.ReadBigEndian<uint>();
         _random = new(seed ^ key);
@@ -21,21 +22,31 @@ public class SwzReader : MarshalByRefObject, IDisposable
 
     public string ReadFile()
     {
+        // read data
         uint compressedSize = _stream.ReadBigEndian<uint>() ^ _random.Next();
         uint decompressedSize = _stream.ReadBigEndian<uint>() ^ _random.Next();
         uint checksum = _stream.ReadBigEndian<uint>();
+        uint checksumInit = _random.Next();
+        // read buffer
         byte[] compressedBuffer = _stream.ReadBuffer((int)compressedSize);
-        SwzUtils.DecryptBuffer(compressedBuffer, _random, out uint calculatedChecksum);
+        // decrypt buffer
+        SwzUtils.CipherBuffer(compressedBuffer, _random);
+        // validate checksum
+        uint calculatedChecksum = SwzUtils.CalculateBufferChecksum(compressedBuffer, checksumInit);
         if (calculatedChecksum != checksum) throw new SwzChecksumException($"File checksum check failed. Expected {checksum} but got {calculatedChecksum}");
+        // decompress
         byte[] buffer = SwzUtils.DecompressBuffer(compressedBuffer);
+        // validate size
         if (buffer.Length != decompressedSize) throw new SwzFileSizeException($"Expected file size to be {decompressedSize}, but file size is {buffer.Length}");
+        // decode
         string content = Encoding.UTF8.GetString(buffer);
+        // return
         return content;
     }
 
     public bool HasNext()
     {
-        return _stream.Position < _stream.Length;
+        return _stream.CanRead && _stream.Position < _stream.Length;
     }
 
     public void Flush()
