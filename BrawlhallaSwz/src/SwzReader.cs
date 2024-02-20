@@ -4,43 +4,43 @@ using System.Text;
 
 namespace BrawlhallaSwz;
 
-public class SwzReader : MarshalByRefObject, IDisposable
+public class SwzReader : IDisposable
 {
     private readonly Stream _stream;
     private readonly SwzRandom _random;
 
     public SwzReader(Stream stream, uint key)
     {
-        _stream = stream;
-        _stream.Position = 0;
+        _stream = stream; _stream.Position = 0;
+        
         uint checksum = _stream.ReadBigEndian<uint>();
         uint seed = _stream.ReadBigEndian<uint>();
+
         _random = new(seed ^ key);
         uint calculatedChecksum = SwzUtils.CalculateKeyChecksum(key, _random);
-        if (calculatedChecksum != checksum) throw new SwzChecksumException($"Key checksum check failed. Expected {checksum} but got {calculatedChecksum}");
+        if (calculatedChecksum != checksum)
+            throw new SwzChecksumException($"Key checksum check failed. Expected {checksum} but got {calculatedChecksum}.");
     }
 
     public string ReadFile()
     {
-        // read data
         uint compressedSize = _stream.ReadBigEndian<uint>() ^ _random.Next();
         uint decompressedSize = _stream.ReadBigEndian<uint>() ^ _random.Next();
         uint checksum = _stream.ReadBigEndian<uint>();
         uint checksumInit = _random.Next();
-        // read buffer
+
         byte[] compressedBuffer = _stream.ReadBuffer((int)compressedSize);
-        // decrypt buffer
         SwzUtils.CipherBuffer(compressedBuffer, _random);
-        // validate checksum
+
         uint calculatedChecksum = SwzUtils.CalculateBufferChecksum(compressedBuffer, checksumInit);
-        if (calculatedChecksum != checksum) throw new SwzChecksumException($"File checksum check failed. Expected {checksum} but got {calculatedChecksum}");
-        // decompress
+        if (calculatedChecksum != checksum)
+            throw new SwzChecksumException($"File checksum check failed. Expected {checksum} but got {calculatedChecksum}.");
+
         byte[] buffer = SwzUtils.DecompressBuffer(compressedBuffer);
-        // validate size
-        if (buffer.Length != decompressedSize) throw new SwzFileSizeException($"Expected file size to be {decompressedSize}, but file size is {buffer.Length}");
-        // decode
+        if (buffer.Length != decompressedSize)
+            throw new SwzFileSizeException($"Expected file size to be {decompressedSize}, but file size is {buffer.Length}.");
+
         string content = Encoding.UTF8.GetString(buffer);
-        // return
         return content;
     }
 

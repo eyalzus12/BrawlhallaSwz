@@ -111,7 +111,6 @@ public static partial class SwzUtils
 
     [GeneratedRegex(@"^<LevelDesc AssetDir=""\w+"" LevelName=""(\w+)"">", RegexOptions.Compiled)]
     private static partial Regex LevelDescRegexGenerator();
-
     [GeneratedRegex(@"^<(\w+)>", RegexOptions.Compiled)]
     private static partial Regex XmlRegexGenerator();
     [GeneratedRegex(@"^(\w+)\n", RegexOptions.Compiled)]
