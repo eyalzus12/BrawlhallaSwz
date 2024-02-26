@@ -1,6 +1,7 @@
 using System;
 using System.IO;
-using BrawlhallaSwz;
+
+namespace BrawlhallaSwz;
 
 public class Sample
 {
