@@ -9,7 +9,7 @@ public class SwzReader : IDisposable
     private readonly Stream _stream;
     private readonly SwzRandom _random;
 
-    public SwzReader(Stream stream, uint key)
+    public SwzReader(Stream stream, uint key, bool ignoreChecksum = false)
     {
         _stream = stream; _stream.Position = 0;
 
@@ -18,11 +18,11 @@ public class SwzReader : IDisposable
 
         _random = new(seed ^ key);
         uint calculatedChecksum = SwzUtils.CalculateKeyChecksum(key, _random);
-        if (calculatedChecksum != checksum)
+        if (!ignoreChecksum && calculatedChecksum != checksum)
             throw new SwzKeyChecksumException($"Key checksum check failed. Expected {checksum} but got {calculatedChecksum}.");
     }
 
-    public string ReadFile()
+    public string ReadFile(bool ignoreChecksum = false, bool ignoreLengthCheck = false)
     {
         uint compressedSize = _stream.ReadBigEndian<uint>() ^ _random.Next();
         uint decompressedSize = _stream.ReadBigEndian<uint>() ^ _random.Next();
@@ -30,11 +30,11 @@ public class SwzReader : IDisposable
 
         byte[] compressedBuffer = _stream.ReadBuffer((int)compressedSize);
         uint calculatedChecksum = SwzUtils.DecryptBuffer(compressedBuffer, _random);
-        if (calculatedChecksum != checksum)
+        if (!ignoreChecksum && calculatedChecksum != checksum)
             throw new SwzFileChecksumException($"File checksum check failed. Expected {checksum} but got {calculatedChecksum}.");
 
         byte[] buffer = SwzUtils.DecompressBuffer(compressedBuffer);
-        if (buffer.Length != decompressedSize)
+        if (!ignoreLengthCheck && buffer.Length != decompressedSize)
             throw new SwzFileSizeException($"Expected file size to be {decompressedSize}, but file size is {buffer.Length}.");
 
         string content = Encoding.UTF8.GetString(buffer);

@@ -72,16 +72,6 @@ public static partial class SwzUtils
         return checksum;
     }
 
-    internal static uint CalculateBufferChecksum(byte[] buffer, uint checksumInit)
-    {
-        uint checksum = checksumInit;
-        for (int i = 0; i < buffer.Length; ++i)
-        {
-            checksum = buffer[i] ^ BitOperations.RotateRight(checksum, i % 7 + 1);
-        }
-        return checksum;
-    }
-
     internal static uint EncryptBuffer(byte[] buffer, SwzRandom rand)
     {
         uint checksum = rand.Next();
