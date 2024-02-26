@@ -27,9 +27,7 @@ public class SwzWriter : IDisposable
 
         uint compressedSize = (uint)compressedBuffer.Length ^ _random.Next();
         uint decompressedSize = (uint)buffer.Length ^ _random.Next();
-        uint checksum = SwzUtils.CalculateBufferChecksum(compressedBuffer, _random.Next());
-
-        SwzUtils.CipherBuffer(compressedBuffer, _random);
+        uint checksum = SwzUtils.EncryptBuffer(compressedBuffer, _random);
 
         _stream.WriteBigEndian(compressedSize);
         _stream.WriteBigEndian(decompressedSize);

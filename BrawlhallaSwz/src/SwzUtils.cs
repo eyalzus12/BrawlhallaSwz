@@ -10,28 +10,27 @@ public static partial class SwzUtils
 {
     internal static byte[] CompressBuffer(byte[] buffer)
     {
-        // create compressor
         using MemoryStream compressedStream = new();
         using (ZLibStream zlibStream = new(compressedStream, CompressionLevel.SmallestSize))
         {
-            // write buffer into compressor
             using MemoryStream bufferStream = new(buffer);
             bufferStream.CopyTo(zlibStream);
         }
-        // get compressed buffer
+
         byte[] compressedBuffer = compressedStream.ToArray();
         return compressedBuffer;
     }
 
     internal static byte[] DecompressBuffer(byte[] compressedBuffer)
     {
-        // create decompressor
-        using MemoryStream compressedStream = new(compressedBuffer);
-        using ZLibStream zlibStream = new(compressedStream, CompressionMode.Decompress);
-        // extract decompressed buffer
         using MemoryStream bufferStream = new();
-        zlibStream.CopyTo(bufferStream);
-        // get decompressed buffer
+
+        using (MemoryStream compressedStream = new(compressedBuffer))
+        using (ZLibStream zlibStream = new(compressedStream, CompressionMode.Decompress))
+        {
+            zlibStream.CopyTo(bufferStream);
+        }
+
         byte[] buffer = bufferStream.ToArray();
         return buffer;
     }
@@ -83,12 +82,26 @@ public static partial class SwzUtils
         return checksum;
     }
 
-    internal static void CipherBuffer(byte[] buffer, SwzRandom rand)
+    internal static uint EncryptBuffer(byte[] buffer, SwzRandom rand)
     {
+        uint checksum = rand.Next();
+        for (int i = 0; i < buffer.Length; ++i)
+        {
+            checksum = buffer[i] ^ BitOperations.RotateRight(checksum, i % 7 + 1);
+            buffer[i] ^= (byte)(rand.Next() >> (i % 16));
+        }
+        return checksum;
+    }
+
+    internal static uint DecryptBuffer(byte[] buffer, SwzRandom rand)
+    {
+        uint checksum = rand.Next();
         for (int i = 0; i < buffer.Length; ++i)
         {
             buffer[i] ^= (byte)(rand.Next() >> (i % 16));
+            checksum = buffer[i] ^ BitOperations.RotateRight(checksum, i % 7 + 1);
         }
+        return checksum;
     }
 
     private static readonly Regex LevelDescRegex = LevelDescRegexGenerator();

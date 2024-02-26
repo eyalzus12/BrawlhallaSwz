@@ -12,14 +12,14 @@ public class SwzReader : IDisposable
     public SwzReader(Stream stream, uint key)
     {
         _stream = stream; _stream.Position = 0;
-        
+
         uint checksum = _stream.ReadBigEndian<uint>();
         uint seed = _stream.ReadBigEndian<uint>();
 
         _random = new(seed ^ key);
         uint calculatedChecksum = SwzUtils.CalculateKeyChecksum(key, _random);
         if (calculatedChecksum != checksum)
-            throw new SwzChecksumException($"Key checksum check failed. Expected {checksum} but got {calculatedChecksum}.");
+            throw new SwzKeyChecksumException($"Key checksum check failed. Expected {checksum} but got {calculatedChecksum}.");
     }
 
     public string ReadFile()
@@ -27,14 +27,11 @@ public class SwzReader : IDisposable
         uint compressedSize = _stream.ReadBigEndian<uint>() ^ _random.Next();
         uint decompressedSize = _stream.ReadBigEndian<uint>() ^ _random.Next();
         uint checksum = _stream.ReadBigEndian<uint>();
-        uint checksumInit = _random.Next();
 
         byte[] compressedBuffer = _stream.ReadBuffer((int)compressedSize);
-        SwzUtils.CipherBuffer(compressedBuffer, _random);
-
-        uint calculatedChecksum = SwzUtils.CalculateBufferChecksum(compressedBuffer, checksumInit);
+        uint calculatedChecksum = SwzUtils.DecryptBuffer(compressedBuffer, _random);
         if (calculatedChecksum != checksum)
-            throw new SwzChecksumException($"File checksum check failed. Expected {checksum} but got {calculatedChecksum}.");
+            throw new SwzFileChecksumException($"File checksum check failed. Expected {checksum} but got {calculatedChecksum}.");
 
         byte[] buffer = SwzUtils.DecompressBuffer(compressedBuffer);
         if (buffer.Length != decompressedSize)
