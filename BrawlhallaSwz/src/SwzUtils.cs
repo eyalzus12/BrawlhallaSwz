@@ -112,9 +112,9 @@ public static partial class SwzUtils
         throw new SwzFileNameException("Could not find file name from file content as it does not match any known format");
     }
 
-    [GeneratedRegex(@"^<LevelDesc AssetDir=""\w+"" LevelName=""(\w+)"">", RegexOptions.Compiled)]
+    [GeneratedRegex(@"^<LevelDesc AssetDir=""\w+""\s+LevelName=""(\w+)"".*?>", RegexOptions.Compiled)]
     private static partial Regex LevelDescRegexGenerator();
-    [GeneratedRegex(@"^<(\w+)>", RegexOptions.Compiled)]
+    [GeneratedRegex(@"^<\s*(\w+)\s*>", RegexOptions.Compiled)]
     private static partial Regex XmlRegexGenerator();
     [GeneratedRegex(@"^(\w+)\n", RegexOptions.Compiled)]
     private static partial Regex CsvRegexGenerator();
