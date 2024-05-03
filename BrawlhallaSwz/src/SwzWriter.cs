@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.Text;
 
@@ -16,23 +17,30 @@ public class SwzWriter : IDisposable
         _random = new(key ^ seed);
         uint checksum = SwzUtils.CalculateKeyChecksum(key, _random);
 
-        _stream.WriteBigEndian(checksum);
-        _stream.WriteBigEndian(seed);
+        Span<byte> buffer = stackalloc byte[4];
+        BinaryPrimitives.WriteUInt32BigEndian(buffer, checksum);
+        _stream.Write(buffer);
+        BinaryPrimitives.WriteUInt32BigEndian(buffer, seed);
+        _stream.Write(buffer);
     }
 
     public void WriteFile(string content)
     {
-        byte[] buffer = Encoding.UTF8.GetBytes(content);
-        byte[] compressedBuffer = SwzUtils.CompressBuffer(buffer);
+        byte[] bytes = Encoding.UTF8.GetBytes(content);
+        byte[] compressedBytes = SwzUtils.CompressBuffer(bytes);
+        uint compressedSize = (uint)compressedBytes.Length ^ _random.Next();
+        uint decompressedSize = (uint)bytes.Length ^ _random.Next();
+        uint checksum = SwzUtils.EncryptBuffer(compressedBytes, _random);
 
-        uint compressedSize = (uint)compressedBuffer.Length ^ _random.Next();
-        uint decompressedSize = (uint)buffer.Length ^ _random.Next();
-        uint checksum = SwzUtils.EncryptBuffer(compressedBuffer, _random);
+        Span<byte> buffer = stackalloc byte[4];
+        BinaryPrimitives.WriteUInt32BigEndian(buffer, compressedSize);
+        _stream.Write(buffer);
+        BinaryPrimitives.WriteUInt32BigEndian(buffer, decompressedSize);
+        _stream.Write(buffer);
+        BinaryPrimitives.WriteUInt32BigEndian(buffer, checksum);
+        _stream.Write(buffer);
 
-        _stream.WriteBigEndian(compressedSize);
-        _stream.WriteBigEndian(decompressedSize);
-        _stream.WriteBigEndian(checksum);
-        _stream.WriteBuffer(compressedBuffer);
+        _stream.Write(compressedBytes);
     }
 
     public void Flush()

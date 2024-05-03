@@ -1,7 +1,7 @@
+using System;
 using System.IO;
 using System.IO.Compression;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
 namespace BrawlhallaSwz;
@@ -35,32 +35,6 @@ public static partial class SwzUtils
         return buffer;
     }
 
-    internal static T ReadBigEndian<T>(this Stream stream) where T : unmanaged, IBinaryInteger<T>
-    {
-        byte[] bytes = new byte[Unsafe.SizeOf<T>()];
-        stream.ReadExactly(bytes, 0, bytes.Length);
-        return T.ReadBigEndian(bytes, true);
-    }
-
-    internal static void WriteBigEndian<T>(this Stream stream, T number) where T : unmanaged, IBinaryInteger<T>
-    {
-        byte[] bytes = new byte[Unsafe.SizeOf<T>()];
-        number.WriteBigEndian(bytes);
-        stream.Write(bytes, 0, bytes.Length);
-    }
-
-    internal static byte[] ReadBuffer(this Stream stream, int amount)
-    {
-        byte[] buffer = new byte[amount];
-        stream.ReadExactly(buffer, 0, amount);
-        return buffer;
-    }
-
-    internal static void WriteBuffer(this Stream stream, byte[] buffer)
-    {
-        stream.Write(buffer, 0, buffer.Length);
-    }
-
     internal static uint CalculateKeyChecksum(uint key, SwzRandom rand)
     {
         uint checksum = 0x2DF4A1CDu;
@@ -72,7 +46,7 @@ public static partial class SwzUtils
         return checksum;
     }
 
-    internal static uint EncryptBuffer(byte[] buffer, SwzRandom rand)
+    internal static uint EncryptBuffer(Span<byte> buffer, SwzRandom rand)
     {
         uint checksum = rand.Next();
         for (int i = 0; i < buffer.Length; ++i)
@@ -83,7 +57,7 @@ public static partial class SwzUtils
         return checksum;
     }
 
-    internal static uint DecryptBuffer(byte[] buffer, SwzRandom rand)
+    internal static uint DecryptBuffer(Span<byte> buffer, SwzRandom rand)
     {
         uint checksum = rand.Next();
         for (int i = 0; i < buffer.Length; ++i)

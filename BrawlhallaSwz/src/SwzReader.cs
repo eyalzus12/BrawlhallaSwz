@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.Text;
 
@@ -13,8 +14,11 @@ public class SwzReader : IDisposable
     {
         _stream = stream; _stream.Position = 0;
 
-        uint checksum = _stream.ReadBigEndian<uint>();
-        uint seed = _stream.ReadBigEndian<uint>();
+        Span<byte> buffer = stackalloc byte[4];
+        _stream.ReadExactly(buffer);
+        uint checksum = BinaryPrimitives.ReadUInt32BigEndian(buffer);
+        _stream.ReadExactly(buffer);
+        uint seed = BinaryPrimitives.ReadUInt32BigEndian(buffer);
 
         _random = new(seed ^ key);
         uint calculatedChecksum = SwzUtils.CalculateKeyChecksum(key, _random);
@@ -24,31 +28,32 @@ public class SwzReader : IDisposable
 
     public string ReadFile(bool ignoreChecksum = false, bool ignoreLengthCheck = false)
     {
-        uint compressedSize = _stream.ReadBigEndian<uint>() ^ _random.Next();
-        uint decompressedSize = _stream.ReadBigEndian<uint>() ^ _random.Next();
-        uint checksum = _stream.ReadBigEndian<uint>();
+        Span<byte> buffer = stackalloc byte[4];
+        _stream.ReadExactly(buffer);
+        uint compressedSize = BinaryPrimitives.ReadUInt32BigEndian(buffer) ^ _random.Next();
+        _stream.ReadExactly(buffer);
+        uint decompressedSize = BinaryPrimitives.ReadUInt32BigEndian(buffer) ^ _random.Next();
+        _stream.ReadExactly(buffer);
+        uint checksum = BinaryPrimitives.ReadUInt32BigEndian(buffer);
 
-        byte[] compressedBuffer = _stream.ReadBuffer((int)compressedSize);
-        uint calculatedChecksum = SwzUtils.DecryptBuffer(compressedBuffer, _random);
+        byte[] compressedBytes = new byte[(int)compressedSize];
+        _stream.ReadExactly(compressedBytes);
+
+        uint calculatedChecksum = SwzUtils.DecryptBuffer(compressedBytes, _random);
         if (!ignoreChecksum && calculatedChecksum != checksum)
             throw new SwzFileChecksumException($"File checksum check failed. Expected {checksum} but got {calculatedChecksum}.");
 
-        byte[] buffer = SwzUtils.DecompressBuffer(compressedBuffer);
-        if (!ignoreLengthCheck && buffer.Length != decompressedSize)
-            throw new SwzFileSizeException($"Expected file size to be {decompressedSize}, but file size is {buffer.Length}.");
+        byte[] bytes = SwzUtils.DecompressBuffer(compressedBytes);
+        if (!ignoreLengthCheck && bytes.Length != decompressedSize)
+            throw new SwzFileSizeException($"Expected file size to be {decompressedSize}, but file size is {bytes.Length}.");
 
-        string content = Encoding.UTF8.GetString(buffer);
+        string content = Encoding.UTF8.GetString(bytes);
         return content;
     }
 
     public bool HasNext()
     {
         return _stream.CanRead && _stream.Position < _stream.Length;
-    }
-
-    public void Flush()
-    {
-        _stream.Flush();
     }
 
     public void Dispose()
