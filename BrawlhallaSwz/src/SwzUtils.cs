@@ -69,6 +69,7 @@ public static partial class SwzUtils
     }
 
     private static readonly Regex LevelDescRegex = LevelDescRegexGenerator();
+    private static readonly Regex CutsceneTypeRegex = CutsceneTypeRegexGenerator();
     private static readonly Regex XmlRegex = XmlRegexGenerator();
     private static readonly Regex CsvRegex = CsvRegexGenerator();
 
@@ -76,7 +77,10 @@ public static partial class SwzUtils
     {
         // LevelDesc
         Match levelDescMatch = LevelDescRegex.Match(content);
-        if (levelDescMatch.Success) return levelDescMatch.Groups[1].Value + ".xml";
+        if (levelDescMatch.Success) return "LevelDesc_" + levelDescMatch.Groups[1].Value + ".xml";
+        // CutsceneType
+        Match cutsceneTypeMatch = CutsceneTypeRegex.Match(content);
+        if (cutsceneTypeMatch.Success) return "CutsceneType_" + cutsceneTypeMatch.Groups[1].Value + ".xml";
         // xml
         Match xmlMatch = XmlRegex.Match(content);
         if (xmlMatch.Success) return xmlMatch.Groups[1].Value + ".xml";
@@ -86,8 +90,10 @@ public static partial class SwzUtils
         throw new SwzFileNameException("Could not find file name from file content as it does not match any known format");
     }
 
-    [GeneratedRegex(@"^<LevelDesc AssetDir=""\w+""\s+LevelName=""(\w+)"".*?>", RegexOptions.Compiled)]
+    [GeneratedRegex(@"^<LevelDesc AssetDir="".+?""\s+LevelName=""(.+?)"".*?>", RegexOptions.Compiled)]
     private static partial Regex LevelDescRegexGenerator();
+    [GeneratedRegex(@"^<CutsceneType CutsceneName=""(.+?)""\s+CutsceneID=""\d+"".*?>", RegexOptions.Compiled)]
+    private static partial Regex CutsceneTypeRegexGenerator();
     [GeneratedRegex(@"^<\s*(\w+)\s*>", RegexOptions.Compiled)]
     private static partial Regex XmlRegexGenerator();
     [GeneratedRegex(@"^(\w+)\n", RegexOptions.Compiled)]
