@@ -11,9 +11,8 @@ public class Sample
         Directory.CreateDirectory(dumpPath);
         using FileStream file = new(path, FileMode.Open, FileAccess.Read);
         using SwzReader swz = new(file, key);
-        while (swz.HasNext())
+        foreach (string fileContent in swz.ReadFiles())
         {
-            string fileContent = swz.ReadFile();
             string fileName = SwzUtils.GetFileName(fileContent);
             Console.WriteLine($"Got file {fileName}");
             string filePath = Path.Combine(dumpPath, fileName);
@@ -29,8 +28,8 @@ public class Sample
         foreach (string filePath in Directory.EnumerateFiles(path))
         {
             Console.WriteLine($"Encrypting {filePath}");
-            string fileContent = File.ReadAllText(filePath);
-            swz.WriteFile(fileContent);
+            using FileStream file = new(filePath, FileMode.Open, FileAccess.Read);
+            swz.WriteFile(file);
         }
     }
 }

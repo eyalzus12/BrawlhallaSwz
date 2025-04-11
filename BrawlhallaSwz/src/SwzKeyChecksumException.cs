@@ -3,7 +3,7 @@ using System;
 namespace BrawlhallaSwz;
 
 [Serializable]
-public class SwzKeyChecksumException : Exception
+public sealed class SwzKeyChecksumException : Exception
 {
     public SwzKeyChecksumException() { }
     public SwzKeyChecksumException(string message) : base(message) { }

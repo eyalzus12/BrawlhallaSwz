@@ -3,7 +3,7 @@ using System;
 namespace BrawlhallaSwz;
 
 [Serializable]
-public class SwzFileChecksumException : Exception
+public sealed class SwzFileChecksumException : Exception
 {
     public SwzFileChecksumException() { }
     public SwzFileChecksumException(string message) : base(message) { }

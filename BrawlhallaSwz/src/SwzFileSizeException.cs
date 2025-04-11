@@ -3,7 +3,7 @@ using System;
 namespace BrawlhallaSwz;
 
 [Serializable]
-public class SwzFileSizeException : Exception
+public sealed class SwzFileSizeException : Exception
 {
     public SwzFileSizeException() { }
     public SwzFileSizeException(string message) : base(message) { }

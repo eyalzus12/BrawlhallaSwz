@@ -1,6 +1,6 @@
 namespace BrawlhallaSwz;
 
-public class SwzRandom
+public sealed class SwzRandom
 {
     private int _index;
     private readonly uint[] _state = new uint[16];

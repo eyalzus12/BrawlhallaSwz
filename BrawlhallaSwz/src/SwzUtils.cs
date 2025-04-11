@@ -1,40 +1,14 @@
 using System;
+using System.Buffers;
 using System.IO;
-using System.IO.Compression;
-using System.Numerics;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace BrawlhallaSwz;
 
 public static partial class SwzUtils
 {
-    internal static byte[] CompressBuffer(byte[] buffer)
-    {
-        using MemoryStream compressedStream = new();
-        using (ZLibStream zlibStream = new(compressedStream, CompressionLevel.SmallestSize))
-        {
-            using MemoryStream bufferStream = new(buffer);
-            bufferStream.CopyTo(zlibStream);
-        }
-
-        byte[] compressedBuffer = compressedStream.ToArray();
-        return compressedBuffer;
-    }
-
-    internal static byte[] DecompressBuffer(byte[] compressedBuffer)
-    {
-        using MemoryStream bufferStream = new();
-
-        using (MemoryStream compressedStream = new(compressedBuffer))
-        using (ZLibStream zlibStream = new(compressedStream, CompressionMode.Decompress))
-        {
-            zlibStream.CopyTo(bufferStream);
-        }
-
-        byte[] buffer = bufferStream.ToArray();
-        return buffer;
-    }
-
     internal static uint CalculateKeyChecksum(uint key, SwzRandom rand)
     {
         uint checksum = 0x2DF4A1CDu;
@@ -46,56 +20,92 @@ public static partial class SwzUtils
         return checksum;
     }
 
-    internal static uint EncryptBuffer(Span<byte> buffer, SwzRandom rand)
+    // why is this not a standard function?
+    internal static long CopyStream(Stream source, Stream destination, long bytes)
     {
-        uint checksum = rand.Next();
-        for (int i = 0; i < buffer.Length; ++i)
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(81920);
+        try
         {
-            checksum = buffer[i] ^ BitOperations.RotateRight(checksum, i % 7 + 1);
-            buffer[i] ^= (byte)(rand.Next() >> (i % 16));
+            long bytesRead = 0;
+            while (bytesRead < bytes)
+            {
+                // read
+                int toRead = Math.Min(buffer.Length, (int)bytes);
+                int read = source.Read(buffer.AsSpan(0, toRead));
+                if (read == 0) break;
+                //write
+                destination.Write(buffer.AsSpan(0, read));
+
+                bytesRead += read;
+            }
+            return bytesRead;
         }
-        return checksum;
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
-    internal static uint DecryptBuffer(Span<byte> buffer, SwzRandom rand)
+    internal static ValueTask<long> CopyStreamAsync(Stream source, Stream destination, long bytes, CancellationToken cancellationToken = default)
     {
-        uint checksum = rand.Next();
-        for (int i = 0; i < buffer.Length; ++i)
-        {
-            buffer[i] ^= (byte)(rand.Next() >> (i % 16));
-            checksum = buffer[i] ^ BitOperations.RotateRight(checksum, i % 7 + 1);
-        }
-        return checksum;
-    }
+        if (cancellationToken.IsCancellationRequested)
+            return ValueTask.FromCanceled<long>(cancellationToken);
 
-    private static readonly Regex LevelDescRegex = LevelDescRegexGenerator();
-    private static readonly Regex CutsceneTypeRegex = CutsceneTypeRegexGenerator();
-    private static readonly Regex XmlRegex = XmlRegexGenerator();
-    private static readonly Regex CsvRegex = CsvRegexGenerator();
+        return Core(source, destination, bytes, cancellationToken);
+
+        static async ValueTask<long> Core(Stream source, Stream destination, long bytes, CancellationToken cancellationToken = default)
+        {
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(81920);
+            try
+            {
+                long bytesRead = 0;
+                while (bytesRead < bytes)
+                {
+                    // read
+                    int toRead = Math.Min(buffer.Length, (int)bytes);
+                    int read = await source.ReadAsync(buffer.AsMemory(0, toRead), cancellationToken).ConfigureAwait(false);
+                    if (read == 0) break;
+                    //write
+                    await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+
+                    bytesRead += read;
+                }
+                return bytesRead;
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
+        }
+    }
 
     public static string GetFileName(string content)
     {
         // LevelDesc
-        Match levelDescMatch = LevelDescRegex.Match(content);
+        Match levelDescMatch = LevelDescRegex().Match(content);
         if (levelDescMatch.Success) return "LevelDesc_" + levelDescMatch.Groups[1].Value + ".xml";
+
         // CutsceneType
-        Match cutsceneTypeMatch = CutsceneTypeRegex.Match(content);
+        Match cutsceneTypeMatch = CutsceneTypeRegex().Match(content);
         if (cutsceneTypeMatch.Success) return "CutsceneType_" + cutsceneTypeMatch.Groups[1].Value + ".xml";
+
         // xml
-        Match xmlMatch = XmlRegex.Match(content);
+        Match xmlMatch = XmlRegex().Match(content);
         if (xmlMatch.Success) return xmlMatch.Groups[1].Value + ".xml";
+
         // csv
-        Match csvMatch = CsvRegex.Match(content);
+        Match csvMatch = CsvRegex().Match(content);
         if (csvMatch.Success) return csvMatch.Groups[1].Value + ".csv";
+
         throw new SwzFileNameException("Could not find file name from file content as it does not match any known format");
     }
 
-    [GeneratedRegex(@"^<LevelDesc AssetDir="".+?""\s+LevelName=""(.+?)"".*?>", RegexOptions.Compiled)]
-    private static partial Regex LevelDescRegexGenerator();
-    [GeneratedRegex(@"^<CutsceneType CutsceneName=""(.+?)""\s+CutsceneID=""\d+"".*?>", RegexOptions.Compiled)]
-    private static partial Regex CutsceneTypeRegexGenerator();
-    [GeneratedRegex(@"^<\s*(\w+)\s*>", RegexOptions.Compiled)]
-    private static partial Regex XmlRegexGenerator();
-    [GeneratedRegex(@"^(\w+)\n", RegexOptions.Compiled)]
-    private static partial Regex CsvRegexGenerator();
+    [GeneratedRegex(@"^<LevelDesc AssetDir="".+?""\s+LevelName=""(.+?)"".*?>")]
+    private static partial Regex LevelDescRegex();
+    [GeneratedRegex(@"^<CutsceneType CutsceneName=""(.+?)""\s+CutsceneID=""[0-9]+"".*?>")]
+    private static partial Regex CutsceneTypeRegex();
+    [GeneratedRegex(@"^<\s*(\w+)\s*>")]
+    private static partial Regex XmlRegex();
+    [GeneratedRegex(@"^(\w+)\n")]
+    private static partial Regex CsvRegex();
 }
