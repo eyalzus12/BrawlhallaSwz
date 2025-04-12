@@ -30,29 +30,15 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         _seed = seed;
     }
 
-    public SwzWriter(Stream stream, uint key, uint seed = 0)
-    {
-        _stream = stream; _stream.Position = 0;
-
-        _random = new(key ^ seed);
-        uint checksum = SwzUtils.CalculateKeyChecksum(key, _random);
-
-        Span<byte> buffer = stackalloc byte[4];
-        BinaryPrimitives.WriteUInt32BigEndian(buffer, checksum);
-        _stream.Write(buffer);
-        BinaryPrimitives.WriteUInt32BigEndian(buffer, seed);
-        _stream.Write(buffer);
-    }
-
     private void EnsureWroteHeader()
     {
         if (_random is not null) return;
         _random = new(_key ^ _seed);
         uint checksum = SwzUtils.CalculateKeyChecksum(_key, _random);
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, checksum);
-        _stream.Write(_buffer.AsSpan(0, 4));
+        _stream.Write(_buffer);
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, _seed);
-        _stream.Write(_buffer.AsSpan(0, 4));
+        _stream.Write(_buffer);
     }
 
     private async ValueTask EnsureWroteHeaderAsync(CancellationToken cancellationToken = default)
@@ -61,9 +47,9 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         _random = new(_key ^ _seed);
         uint checksum = SwzUtils.CalculateKeyChecksum(_key, _random);
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, checksum);
-        await _stream.WriteAsync(_buffer.AsMemory(0, 4), cancellationToken);
+        await _stream.WriteAsync(_buffer, cancellationToken).ConfigureAwait(false);
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, _seed);
-        await _stream.WriteAsync(_buffer.AsMemory(0, 4), cancellationToken);
+        await _stream.WriteAsync(_buffer, cancellationToken).ConfigureAwait(false);
     }
 
     public void WriteFile(Stream stream)
@@ -72,6 +58,8 @@ public class SwzWriter : IDisposable, IAsyncDisposable
 
         ArgumentNullException.ThrowIfNull(stream);
         if (!stream.CanRead) throw new NotSupportedException("Given stream does not support reading");
+
+        EnsureWroteHeader();
 
         long decompressedSize_ = stream.Length;
         if (decompressedSize_ > uint.MaxValue) throw new OverflowException("Size of given stream exceeds uint32 max");
@@ -114,6 +102,8 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(stream);
         if (!stream.CanRead) throw new NotSupportedException("Given stream does not support reading");
 
+        await EnsureWroteHeaderAsync(cancellationToken);
+
         long decompressedSize_ = stream.Length;
         if (decompressedSize_ > uint.MaxValue) throw new OverflowException("Size of given stream exceeds uint32 max");
 
@@ -138,12 +128,12 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         // write file data
         uint compressedSize = (uint)compressedSize_ ^ compressedSizeSalt;
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, compressedSize);
-        await _stream.WriteAsync(_buffer, cancellationToken);
+        await _stream.WriteAsync(_buffer, cancellationToken).ConfigureAwait(false);
         uint decompressedSize = (uint)decompressedSize_ ^ decompressedSizeSalt;
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, decompressedSize);
-        await _stream.WriteAsync(_buffer, cancellationToken);
+        await _stream.WriteAsync(_buffer, cancellationToken).ConfigureAwait(false);
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, checksum);
-        await _stream.WriteAsync(_buffer, cancellationToken);
+        await _stream.WriteAsync(_buffer, cancellationToken).ConfigureAwait(false);
         // write file
         await intermediate.CopyToAsync(_stream, cancellationToken);
     }
@@ -213,12 +203,8 @@ public class SwzWriter : IDisposable, IAsyncDisposable
     {
         Stream stream = _stream;
         _stream = null!;
-        try
-        {
-            if (!_leaveOpen && stream is not null)
-                await stream.DisposeAsync().ConfigureAwait(false);
-        }
-        catch { }
+        if (!_leaveOpen && stream is not null)
+            await stream.DisposeAsync().ConfigureAwait(false);
     }
 
     ~SwzWriter()

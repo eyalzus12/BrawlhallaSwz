@@ -77,9 +77,9 @@ public class SwzReader : IDisposable, IAsyncDisposable
     {
         if (_random is not null) return false;
 
-        await _stream.ReadExactlyAsync(_buffer, 0, 4, cancellationToken);
+        await _stream.ReadExactlyAsync(_buffer, cancellationToken).ConfigureAwait(false);
         uint checksum = BinaryPrimitives.ReadUInt32BigEndian(_buffer);
-        await _stream.ReadExactlyAsync(_buffer, 0, 4, cancellationToken);
+        await _stream.ReadExactlyAsync(_buffer, cancellationToken).ConfigureAwait(false);
         uint seed = BinaryPrimitives.ReadUInt32BigEndian(_buffer);
 
         InitializeRandom(seed, checksum);
@@ -100,15 +100,13 @@ public class SwzReader : IDisposable, IAsyncDisposable
     {
         EnsureReadHeader();
 
-        _stream.ReadExactly(_buffer.AsSpan(0, 4));
+        _stream.ReadExactly(_buffer);
         uint compressedSize = BinaryPrimitives.ReadUInt32BigEndian(_buffer) ^ _random.Next();
-        if (compressedSize > int.MaxValue) throw new OverflowException("Compressed size exceeds int32 max");
 
-        _stream.ReadExactly(_buffer.AsSpan(0, 4));
+        _stream.ReadExactly(_buffer);
         uint decompressedSize = BinaryPrimitives.ReadUInt32BigEndian(_buffer) ^ _random.Next();
-        if (decompressedSize > int.MaxValue) throw new OverflowException("Decompressed size exceeds int32 max");
 
-        _stream.ReadExactly(_buffer.AsSpan(0, 4));
+        _stream.ReadExactly(_buffer);
         uint checksum = BinaryPrimitives.ReadUInt32BigEndian(_buffer);
 
         using MemoryStream? intermediate = WriteEvenIfValidationFails(options) ? null : new();
@@ -119,7 +117,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
         using (SwzDecryptStream decryptor = new(sub, _random, true))
         using (ZLibStream zLibStream = new(decryptor, CompressionMode.Decompress, true))
         {
-            amountCopied = SwzUtils.CopyStream(zLibStream, intermediate ?? destStream, (int)decompressedSize);
+            amountCopied = SwzUtils.CopyStream(zLibStream, intermediate ?? destStream, decompressedSize);
             computedChecksum = decryptor.Checksum;
         }
 
@@ -159,15 +157,13 @@ public class SwzReader : IDisposable, IAsyncDisposable
     {
         await EnsureReadHeaderAsync(cancellationToken);
 
-        await _stream.ReadExactlyAsync(_buffer.AsMemory(0, 4), cancellationToken);
+        await _stream.ReadExactlyAsync(_buffer, cancellationToken).ConfigureAwait(false);
         uint compressedSize = BinaryPrimitives.ReadUInt32BigEndian(_buffer) ^ _random.Next();
-        if (compressedSize > int.MaxValue) throw new OverflowException("Compressed size exceeds int32 max");
 
-        await _stream.ReadExactlyAsync(_buffer.AsMemory(0, 4), cancellationToken);
+        await _stream.ReadExactlyAsync(_buffer, cancellationToken).ConfigureAwait(false);
         uint decompressedSize = BinaryPrimitives.ReadUInt32BigEndian(_buffer) ^ _random.Next();
-        if (decompressedSize > int.MaxValue) throw new OverflowException("Decompressed size exceeds int32 max");
 
-        await _stream.ReadExactlyAsync(_buffer.AsMemory(0, 4), cancellationToken);
+        await _stream.ReadExactlyAsync(_buffer, cancellationToken).ConfigureAwait(false);
         uint checksum = BinaryPrimitives.ReadUInt32BigEndian(_buffer);
 
         using MemoryStream? intermediate = WriteEvenIfValidationFails(options) ? null : new();
@@ -178,7 +174,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
         using (SwzDecryptStream decryptor = new(sub, _random, true))
         using (ZLibStream zLibStream = new(decryptor, CompressionMode.Decompress, true))
         {
-            amountCopied = await SwzUtils.CopyStreamAsync(zLibStream, intermediate ?? destStream, (int)decompressedSize, cancellationToken);
+            amountCopied = await SwzUtils.CopyStreamAsync(zLibStream, intermediate ?? destStream, decompressedSize, cancellationToken);
             computedChecksum = decryptor.Checksum;
         }
 
@@ -200,7 +196,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
         if (intermediate is not null)
         {
             intermediate.Position = 0;
-            await intermediate.CopyToAsync(destStream, cancellationToken);
+            await intermediate.CopyToAsync(destStream, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -296,12 +292,8 @@ public class SwzReader : IDisposable, IAsyncDisposable
     {
         Stream stream = _stream;
         _stream = null!;
-        try
-        {
-            if (!_leaveOpen && stream is not null)
-                await stream.DisposeAsync().ConfigureAwait(false);
-        }
-        catch { }
+        if (!_leaveOpen && stream is not null)
+            await stream.DisposeAsync().ConfigureAwait(false);
     }
 
     ~SwzReader()

@@ -44,7 +44,8 @@ internal sealed class SubStream : Stream
     public override int Read(Span<byte> buffer)
     {
         EnsureNotDisposed();
-        int result = _stream.Read(buffer[..GetActualRead(buffer.Length)]);
+        int tryRead = GetActualRead(buffer.Length);
+        int result = _stream.Read(buffer[..tryRead]);
         _position += result;
         return result;
     }
@@ -66,7 +67,8 @@ internal sealed class SubStream : Stream
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {
         EnsureNotDisposed();
-        int result = await _stream.ReadAsync(buffer[..GetActualRead(buffer.Length)], cancellationToken);
+        int tryRead = GetActualRead(buffer.Length);
+        int result = await _stream.ReadAsync(buffer[..tryRead], cancellationToken).ConfigureAwait(false);
         _position += result;
         return result;
     }

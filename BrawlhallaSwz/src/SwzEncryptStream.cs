@@ -83,7 +83,8 @@ public sealed class SwzEncryptStream : Stream
         while (copied < buffer.Length)
         {
             // copy
-            int canCopy = Math.Min(_buffer.Length - copied, buffer.Length);
+            int leftToCopy = buffer.Length - copied;
+            int canCopy = Math.Min(leftToCopy, _buffer.Length);
             buffer.Slice(copied, canCopy).CopyTo(_buffer);
             // encrypt section
             EncryptInternalBuffer(canCopy);
@@ -116,12 +117,13 @@ public sealed class SwzEncryptStream : Stream
         while (copied < buffer.Length)
         {
             // copy
-            int canCopy = Math.Min(_buffer.Length - copied, buffer.Length);
+            int leftToCopy = buffer.Length - copied;
+            int canCopy = Math.Min(leftToCopy, _buffer.Length);
             buffer.Slice(copied, canCopy).CopyTo(_buffer);
             // encrypt section
             EncryptInternalBuffer(canCopy);
             // write
-            await _stream.WriteAsync(_buffer.AsMemory(0, canCopy), cancellationToken);
+            await _stream.WriteAsync(_buffer.AsMemory(0, canCopy), cancellationToken).ConfigureAwait(false);
 
             copied += canCopy;
         }
@@ -129,7 +131,6 @@ public sealed class SwzEncryptStream : Stream
 
     protected override void Dispose(bool disposing)
     {
-        // dispose stream
         Stream stream = _stream;
         _stream = null!;
         try
@@ -139,30 +140,24 @@ public sealed class SwzEncryptStream : Stream
         }
         finally
         {
-            // dispose random
             _random = null!;
-            // dispose buffer
+
             byte[]? buffer = _buffer;
             if (buffer is not null)
             {
-                _buffer = null!;
                 ArrayPool<byte>.Shared.Return(buffer);
+                _buffer = null!;
             }
         }
     }
 
     public override async ValueTask DisposeAsync()
     {
-        // dispose stream
         Stream stream = _stream;
         _stream = null!;
-        try
-        {
-            if (!_leaveOpen && stream is not null)
-                await stream.DisposeAsync().ConfigureAwait(false);
-        }
-        catch { }
-        // dispose rest
+        if (!_leaveOpen && stream is not null)
+            await stream.DisposeAsync().ConfigureAwait(false);
+
         Dispose(false);
     }
 

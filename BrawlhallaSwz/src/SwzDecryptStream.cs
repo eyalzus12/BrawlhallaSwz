@@ -55,25 +55,32 @@ public sealed class SwzDecryptStream : Stream
     public override int Read(Span<byte> buffer)
     {
         EnsureNotDisposed();
-        // read
+
         InitializeBuffer();
-        int read = _stream.Read(_buffer);
+
+        // cut down our buffer if it is too long
+        Span<byte> tempBuffer = _buffer.AsSpan();
+        if (tempBuffer.Length > buffer.Length) tempBuffer = tempBuffer[..buffer.Length];
+
+        int read = _stream.Read(tempBuffer);
         if (read == 0) return 0;
-        // decrypt
+
         InitializeChecksum();
         DecryptInternalBuffer(read);
-        // return
+
+        // copy over whatever was read
         _buffer.AsSpan(0, read).CopyTo(buffer);
+
         return read;
     }
 
     public override int ReadByte()
     {
         EnsureNotDisposed();
-        // read
+
         int b = _stream.ReadByte();
         if (b == -1) return b;
-        // decrypt
+
         InitializeChecksum();
         return DecryptByte((byte)b);
     }
@@ -94,15 +101,21 @@ public sealed class SwzDecryptStream : Stream
 
         async ValueTask<int> Core(Memory<byte> buffer, CancellationToken cancellationToken)
         {
-            // read
             InitializeBuffer();
-            int read = await _stream.ReadAsync(_buffer, cancellationToken).ConfigureAwait(false);
+
+            // cut down our buffer if it is too long
+            Memory<byte> tempBuffer = _buffer;
+            if (tempBuffer.Length > buffer.Length) tempBuffer = tempBuffer[..buffer.Length];
+
+            int read = await _stream.ReadAsync(tempBuffer, cancellationToken).ConfigureAwait(false);
             if (read == 0) return 0;
-            // decrypt
+
             InitializeChecksum();
             DecryptInternalBuffer(read);
-            // return
+
+            // copy over whatever was read
             _buffer.AsMemory(0, read).CopyTo(buffer);
+
             return read;
         }
     }
@@ -134,30 +147,24 @@ public sealed class SwzDecryptStream : Stream
         }
         finally
         {
-            // dispose random
             _random = null!;
-            // dispose buffer
+
             byte[]? buffer = _buffer;
             if (buffer is not null)
             {
-                _buffer = null!;
                 ArrayPool<byte>.Shared.Return(buffer);
+                _buffer = null!;
             }
         }
     }
 
     public override async ValueTask DisposeAsync()
     {
-        // dispose stream
         Stream stream = _stream;
         _stream = null!;
-        try
-        {
-            if (!_leaveOpen && stream is not null)
-                await stream.DisposeAsync().ConfigureAwait(false);
-        }
-        catch { }
-        // dispose rest
+        if (!_leaveOpen && stream is not null)
+            await stream.DisposeAsync().ConfigureAwait(false);
+
         Dispose(false);
     }
 

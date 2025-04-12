@@ -30,7 +30,8 @@ public static partial class SwzUtils
             while (bytesRead < bytes)
             {
                 // read
-                int toRead = Math.Min(buffer.Length, (int)bytes);
+                long wantToRead = bytes - bytesRead;
+                int toRead = wantToRead > buffer.Length ? buffer.Length : (int)wantToRead;
                 int read = source.Read(buffer.AsSpan(0, toRead));
                 if (read == 0) break;
                 //write
@@ -62,7 +63,8 @@ public static partial class SwzUtils
                 while (bytesRead < bytes)
                 {
                     // read
-                    int toRead = Math.Min(buffer.Length, (int)bytes);
+                    long wantToRead = bytes - bytesRead;
+                    int toRead = wantToRead > buffer.Length ? buffer.Length : (int)wantToRead;
                     int read = await source.ReadAsync(buffer.AsMemory(0, toRead), cancellationToken).ConfigureAwait(false);
                     if (read == 0) break;
                     //write

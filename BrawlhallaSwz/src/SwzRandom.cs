@@ -2,12 +2,11 @@ namespace BrawlhallaSwz;
 
 public sealed class SwzRandom
 {
-    private int _index;
+    private int _index = 0;
     private readonly uint[] _state = new uint[16];
 
     public SwzRandom(uint seed)
     {
-        _index = 0;
         _state[0] = seed;
         for (uint i = 1; i < 16; ++i) _state[i] = i + 0x6C078965u * (_state[i - 1] ^ (_state[i - 1] >> 30));
     }
