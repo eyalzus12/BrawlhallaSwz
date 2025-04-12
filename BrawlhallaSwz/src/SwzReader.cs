@@ -209,7 +209,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
         EnsureNotDisposed();
 
         using MemoryStream ms = new();
-        ReadFileCore(ms, SwzReaderOptions.WriteEvenIfValidationFails);
+        ReadFileCore(ms, Options | SwzReaderOptions.WriteEvenIfValidationFails);
         ms.Position = 0;
         using StreamReader sr = new(ms, new UTF8Encoding(false));
         return sr.ReadToEnd();
@@ -220,7 +220,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
         EnsureNotDisposed();
 
         using MemoryStream ms = new();
-        await ReadFileCoreAsync(ms, SwzReaderOptions.WriteEvenIfValidationFails, cancellationToken);
+        await ReadFileCoreAsync(ms, Options | SwzReaderOptions.WriteEvenIfValidationFails, cancellationToken);
         ms.Position = 0;
         using StreamReader sr = new(ms, new UTF8Encoding(false));
         return await sr.ReadToEndAsync(cancellationToken);
@@ -235,7 +235,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
         while (HasNext())
         {
             ms.SetLength(0); // also sets Position to 0
-            ReadFileCore(ms, SwzReaderOptions.WriteEvenIfValidationFails);
+            ReadFileCore(ms, Options | SwzReaderOptions.WriteEvenIfValidationFails);
             ms.Position = 0;
             yield return sr.ReadToEnd();
         }
@@ -250,7 +250,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
         while (HasNext())
         {
             ms.SetLength(0); // also sets Position to 0
-            await ReadFileCoreAsync(ms, SwzReaderOptions.WriteEvenIfValidationFails, cancellationToken);
+            await ReadFileCoreAsync(ms, Options | SwzReaderOptions.WriteEvenIfValidationFails, cancellationToken);
             ms.Position = 0;
             yield return await sr.ReadToEndAsync(cancellationToken);
         }
