@@ -14,15 +14,15 @@ namespace BrawlhallaSwz;
 public enum SwzReaderOptions
 {
     None = 0,
-    // Don't check the key checksum is correct
+    // Don't check the key checksum is correct.
     IgnoreKeyChecksum = 0b0001,
-    // Don't check the file checksum is correct
+    // Don't check the file checksum is correct.
     IgnoreFileChecksum = 0b0010,
-    // Don't check the file length is correct
+    // Don't check the file length is correct.
     NoCheckFileLength = 0b0100,
-    // Skips using an intermediate buffer for storing the file.
-    // Will cause data to be written to the stream before it is validated.
-    WriteEvenIfValidationFails = 0b1000,
+    // Avoid writing to the stream if validation fails.
+    // Requires using an intermediate buffer.
+    AvoidWriteIfValidationFails = 0b1000,
 }
 
 public class SwzReader : IDisposable, IAsyncDisposable
@@ -31,9 +31,9 @@ public class SwzReader : IDisposable, IAsyncDisposable
     private readonly bool _leaveOpen;
     public SwzReaderOptions Options { get; set; }
     private bool IgnoreKeyChecksum => (Options & SwzReaderOptions.IgnoreKeyChecksum) != 0;
-    private static bool IgnoreFileChecksum(SwzReaderOptions options) => (options & SwzReaderOptions.IgnoreFileChecksum) != 0;
-    private static bool NoCheckFileLength(SwzReaderOptions options) => (options & SwzReaderOptions.NoCheckFileLength) != 0;
-    private static bool WriteEvenIfValidationFails(SwzReaderOptions options) => (options & SwzReaderOptions.WriteEvenIfValidationFails) != 0;
+    private bool IgnoreFileChecksum => (Options & SwzReaderOptions.IgnoreFileChecksum) != 0;
+    private bool NoCheckFileLength => (Options & SwzReaderOptions.NoCheckFileLength) != 0;
+    private bool AvoidWriteIfValidationFails => (Options & SwzReaderOptions.AvoidWriteIfValidationFails) != 0;
 
     private byte[] _buffer = new byte[4];
 
@@ -64,9 +64,9 @@ public class SwzReader : IDisposable, IAsyncDisposable
     {
         if (_random is not null) return false;
 
-        _stream.ReadExactly(_buffer, 0, 4);
+        _stream.ReadExactly(_buffer);
         uint checksum = BinaryPrimitives.ReadUInt32BigEndian(_buffer);
-        _stream.ReadExactly(_buffer, 0, 4);
+        _stream.ReadExactly(_buffer);
         uint seed = BinaryPrimitives.ReadUInt32BigEndian(_buffer);
 
         InitializeRandom(seed, checksum);
@@ -93,10 +93,10 @@ public class SwzReader : IDisposable, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(destStream);
         if (!destStream.CanWrite) throw new NotSupportedException("Given stream does not support writing");
 
-        ReadFileCore(destStream, Options);
+        ReadFileCore(destStream);
     }
 
-    private void ReadFileCore(Stream destStream, SwzReaderOptions options)
+    private void ReadFileCore(Stream destStream)
     {
         EnsureReadHeader();
 
@@ -109,7 +109,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
         _stream.ReadExactly(_buffer);
         uint checksum = BinaryPrimitives.ReadUInt32BigEndian(_buffer);
 
-        using MemoryStream? intermediate = WriteEvenIfValidationFails(options) ? null : new();
+        using MemoryStream? intermediate = AvoidWriteIfValidationFails ? new() : null;
 
         long amountCopied;
         uint computedChecksum;
@@ -122,7 +122,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
         }
 
         // validate. TODO: extract this logic to share it with the async version
-        if (!NoCheckFileLength(options))
+        if (!NoCheckFileLength)
         {
             // did not copy everything. decompressedSize is too big!
             if (amountCopied != decompressedSize)
@@ -132,7 +132,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
                 throw new SwzFileSizeException($"Expected compressed file size to be {compressedSize}, but it was actually {sub.Position}");
         }
         // compare checksum
-        if (!IgnoreFileChecksum(options) && computedChecksum != checksum)
+        if (!IgnoreFileChecksum && computedChecksum != checksum)
             throw new SwzFileChecksumException($"File checksum check failed. Expected {checksum} but got {computedChecksum}.");
 
         // copy if using intermediate stream
@@ -150,12 +150,12 @@ public class SwzReader : IDisposable, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(destStream);
         if (!destStream.CanWrite) throw new NotSupportedException("Given stream does not support writing");
 
-        return ReadFileCoreAsync(destStream, Options, cancellationToken);
+        return ReadFileCoreAsync(destStream, cancellationToken);
     }
 
-    private async ValueTask ReadFileCoreAsync(Stream destStream, SwzReaderOptions options, CancellationToken cancellationToken = default)
+    private async ValueTask ReadFileCoreAsync(Stream destStream, CancellationToken cancellationToken = default)
     {
-        await EnsureReadHeaderAsync(cancellationToken);
+        await EnsureReadHeaderAsync(cancellationToken).ConfigureAwait(false);
 
         await _stream.ReadExactlyAsync(_buffer, cancellationToken).ConfigureAwait(false);
         uint compressedSize = BinaryPrimitives.ReadUInt32BigEndian(_buffer) ^ _random.Next();
@@ -166,7 +166,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
         await _stream.ReadExactlyAsync(_buffer, cancellationToken).ConfigureAwait(false);
         uint checksum = BinaryPrimitives.ReadUInt32BigEndian(_buffer);
 
-        using MemoryStream? intermediate = WriteEvenIfValidationFails(options) ? null : new();
+        using MemoryStream? intermediate = AvoidWriteIfValidationFails ? new() : null;
 
         long amountCopied;
         uint computedChecksum;
@@ -174,12 +174,12 @@ public class SwzReader : IDisposable, IAsyncDisposable
         using (SwzDecryptStream decryptor = new(sub, _random, true))
         using (ZLibStream zLibStream = new(decryptor, CompressionMode.Decompress, true))
         {
-            amountCopied = await SwzUtils.CopyStreamAsync(zLibStream, intermediate ?? destStream, decompressedSize, cancellationToken);
+            amountCopied = await SwzUtils.CopyStreamAsync(zLibStream, intermediate ?? destStream, decompressedSize, cancellationToken).ConfigureAwait(false);
             computedChecksum = decryptor.Checksum;
         }
 
         // validate. TODO: extract this logic to share it with the sync version
-        if (!NoCheckFileLength(options))
+        if (!NoCheckFileLength)
         {
             // did not copy everything. decompressedSize is too big!
             if (amountCopied != decompressedSize)
@@ -189,7 +189,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
                 throw new SwzFileSizeException($"Expected compressed file size to be {compressedSize}, but it was actually {sub.Position}");
         }
         // compare checksum
-        if (!IgnoreFileChecksum(options) && computedChecksum != checksum)
+        if (!IgnoreFileChecksum && computedChecksum != checksum)
             throw new SwzFileChecksumException($"File checksum check failed. Expected {checksum} but got {computedChecksum}.");
 
         // copy if using intermediate stream
@@ -205,7 +205,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
         EnsureNotDisposed();
 
         using MemoryStream ms = new();
-        ReadFileCore(ms, Options | SwzReaderOptions.WriteEvenIfValidationFails);
+        ReadFileCore(ms);
         ms.Position = 0;
         using StreamReader sr = new(ms, new UTF8Encoding(false));
         return sr.ReadToEnd();
@@ -216,10 +216,10 @@ public class SwzReader : IDisposable, IAsyncDisposable
         EnsureNotDisposed();
 
         using MemoryStream ms = new();
-        await ReadFileCoreAsync(ms, Options | SwzReaderOptions.WriteEvenIfValidationFails, cancellationToken);
+        await ReadFileCoreAsync(ms, cancellationToken).ConfigureAwait(false);
         ms.Position = 0;
         using StreamReader sr = new(ms, new UTF8Encoding(false));
-        return await sr.ReadToEndAsync(cancellationToken);
+        return await sr.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public IEnumerable<string> ReadFiles()
@@ -231,7 +231,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
         while (HasNext())
         {
             ms.SetLength(0); // also sets Position to 0
-            ReadFileCore(ms, Options | SwzReaderOptions.WriteEvenIfValidationFails);
+            ReadFileCore(ms);
             ms.Position = 0;
             yield return sr.ReadToEnd();
         }
@@ -246,9 +246,9 @@ public class SwzReader : IDisposable, IAsyncDisposable
         while (HasNext())
         {
             ms.SetLength(0); // also sets Position to 0
-            await ReadFileCoreAsync(ms, Options | SwzReaderOptions.WriteEvenIfValidationFails, cancellationToken);
+            await ReadFileCoreAsync(ms, cancellationToken).ConfigureAwait(false);
             ms.Position = 0;
-            yield return await sr.ReadToEndAsync(cancellationToken);
+            yield return await sr.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -283,7 +283,7 @@ public class SwzReader : IDisposable, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await DisposeAsyncCore();
+        await DisposeAsyncCore().ConfigureAwait(false);
         Dispose(false);
         GC.SuppressFinalize(this);
     }

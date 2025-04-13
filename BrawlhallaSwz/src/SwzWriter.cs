@@ -14,6 +14,7 @@ public class SwzWriter : IDisposable, IAsyncDisposable
     private readonly bool _leaveOpen;
 
     private byte[] _buffer = new byte[4];
+    private MemoryStream? _intermediate = null;
 
     private readonly uint _key;
     private readonly uint _seed;
@@ -59,6 +60,11 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(stream);
         if (!stream.CanRead) throw new NotSupportedException("Given stream does not support reading");
 
+        WriteFileCore(stream);
+    }
+
+    private void WriteFileCore(Stream stream)
+    {
         EnsureWroteHeader();
 
         long decompressedSize_ = stream.Length;
@@ -69,17 +75,18 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         uint decompressedSizeSalt = _random.Next();
 
         // we have to write the checksum before writing the content, so we have to consume the stream.
-        using MemoryStream intermediate = new();
+        _intermediate ??= new();
+        _intermediate.SetLength(0);
 
         uint checksum;
         using (ZLibStream zLibStream = new(stream, CompressionLevel.SmallestSize, true))
         using (SwzEncryptStream encryptor = new(zLibStream, _random, true))
         {
-            encryptor.CopyTo(intermediate);
+            encryptor.CopyTo(_intermediate);
             checksum = encryptor.Checksum;
         }
 
-        long compressedSize_ = intermediate.Length;
+        long compressedSize_ = _intermediate.Length;
         if (compressedSize_ > uint.MaxValue) throw new OverflowException("Size of compressed file exceeds uint32 max");
 
         // write file data
@@ -92,7 +99,7 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, checksum);
         _stream.Write(_buffer);
         // write file
-        intermediate.WriteTo(_stream);
+        _intermediate.WriteTo(_stream);
     }
 
     public async ValueTask WriteFileAsync(Stream stream, CancellationToken cancellationToken = default)
@@ -102,7 +109,12 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(stream);
         if (!stream.CanRead) throw new NotSupportedException("Given stream does not support reading");
 
-        await EnsureWroteHeaderAsync(cancellationToken);
+        await WriteFileCoreAsync(stream, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask WriteFileCoreAsync(Stream stream, CancellationToken cancellationToken = default)
+    {
+        await EnsureWroteHeaderAsync(cancellationToken).ConfigureAwait(false);
 
         long decompressedSize_ = stream.Length;
         if (decompressedSize_ > uint.MaxValue) throw new OverflowException("Size of given stream exceeds uint32 max");
@@ -112,17 +124,18 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         uint decompressedSizeSalt = _random.Next();
 
         // we have to write the checksum before writing the content, so we have to consume the stream.
-        using MemoryStream intermediate = new();
+        _intermediate ??= new();
+        _intermediate.SetLength(0);
 
         uint checksum;
         using (SwzEncryptStream encryptor = new(stream, _random, true))
         using (ZLibStream zLibStream = new(encryptor, CompressionLevel.SmallestSize, true))
         {
-            await zLibStream.CopyToAsync(intermediate, cancellationToken);
+            await zLibStream.CopyToAsync(_intermediate, cancellationToken).ConfigureAwait(false);
             checksum = encryptor.Checksum;
         }
 
-        long compressedSize_ = intermediate.Length;
+        long compressedSize_ = _intermediate.Length;
         if (compressedSize_ > uint.MaxValue) throw new OverflowException("Size of compressed file exceeds uint32 max");
 
         // write file data
@@ -135,7 +148,7 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, checksum);
         await _stream.WriteAsync(_buffer, cancellationToken).ConfigureAwait(false);
         // write file
-        await intermediate.CopyToAsync(_stream, cancellationToken);
+        await _intermediate.CopyToAsync(_stream, cancellationToken).ConfigureAwait(false);
     }
 
     public void WriteFile(string content)
@@ -144,7 +157,7 @@ public class SwzWriter : IDisposable, IAsyncDisposable
 
         byte[] bytes = Encoding.UTF8.GetBytes(content);
         using MemoryStream ms = new(bytes);
-        WriteFile(ms);
+        WriteFileCore(ms);
     }
 
     public ValueTask WriteFileAsync(string content, CancellationToken cancellationToken = default)
@@ -156,7 +169,7 @@ public class SwzWriter : IDisposable, IAsyncDisposable
 
         byte[] bytes = Encoding.UTF8.GetBytes(content);
         using MemoryStream ms = new(bytes);
-        return WriteFileAsync(ms, cancellationToken);
+        return WriteFileCoreAsync(ms, cancellationToken);
     }
 
     public void Flush()
@@ -187,6 +200,11 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         }
         finally
         {
+            if (_intermediate is not null)
+            {
+                _intermediate.Dispose();
+                _intermediate = null!;
+            }
             _random = null!;
             _buffer = null!;
         }
@@ -194,7 +212,7 @@ public class SwzWriter : IDisposable, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await DisposeAsyncCore();
+        await DisposeAsyncCore().ConfigureAwait(false);
         Dispose(false);
         GC.SuppressFinalize(this);
     }
