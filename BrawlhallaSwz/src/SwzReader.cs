@@ -15,14 +15,14 @@ public enum SwzReaderOptions
 {
     None = 0,
     // Don't check the key checksum is correct.
-    IgnoreKeyChecksum = 0b0001,
+    IgnoreKeyChecksum = 1 << 0,
     // Don't check the file checksum is correct.
-    IgnoreFileChecksum = 0b0010,
+    IgnoreFileChecksum = 1 << 1,
     // Don't check the file length is correct.
-    NoCheckFileLength = 0b0100,
+    NoCheckFileLength = 1 << 2,
     // Avoid writing to the stream if validation fails.
     // Requires using an intermediate buffer.
-    AvoidWriteIfValidationFails = 0b1000,
+    AvoidWriteIfValidationFails = 1 << 3,
 }
 
 public class SwzReader : IDisposable, IAsyncDisposable
@@ -30,10 +30,10 @@ public class SwzReader : IDisposable, IAsyncDisposable
     private Stream _stream;
     private readonly bool _leaveOpen;
     public SwzReaderOptions Options { get; set; }
-    private bool IgnoreKeyChecksum => (Options & SwzReaderOptions.IgnoreKeyChecksum) != 0;
-    private bool IgnoreFileChecksum => (Options & SwzReaderOptions.IgnoreFileChecksum) != 0;
-    private bool NoCheckFileLength => (Options & SwzReaderOptions.NoCheckFileLength) != 0;
-    private bool AvoidWriteIfValidationFails => (Options & SwzReaderOptions.AvoidWriteIfValidationFails) != 0;
+    private bool IgnoreKeyChecksum => Options.HasFlag(SwzReaderOptions.IgnoreKeyChecksum);
+    private bool IgnoreFileChecksum => Options.HasFlag(SwzReaderOptions.IgnoreFileChecksum);
+    private bool NoCheckFileLength => Options.HasFlag(SwzReaderOptions.NoCheckFileLength);
+    private bool AvoidWriteIfValidationFails => Options.HasFlag(SwzReaderOptions.AvoidWriteIfValidationFails);
 
     private byte[] _buffer = new byte[4];
 
