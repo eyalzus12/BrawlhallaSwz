@@ -16,14 +16,14 @@ public sealed class SwzEncryptStream : Stream
     private SwzRandom _random;
 
     public uint Checksum { get; private set; } = 0;
-    private int _index = -1;
+    private long _index = -1;
     private byte[] _buffer = null!;
 
     public SwzEncryptStream(Stream stream, SwzRandom random, bool leaveOpen = false)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(random);
-        if (!stream.CanRead) throw new NotSupportedException("Given stream is not readable");
+        if (!stream.CanWrite) throw new NotSupportedException("Given stream is not writeable");
 
         _stream = stream;
         _leaveOpen = leaveOpen;
@@ -182,8 +182,8 @@ public sealed class SwzEncryptStream : Stream
 
     private byte EncryptByte(byte b)
     {
-        Checksum = b ^ BitOperations.RotateRight(Checksum, _index % 7 + 1);
-        b ^= (byte)(_random.Next() >> (_index % 16));
+        Checksum = b ^ BitOperations.RotateRight(Checksum, (int)(_index % 7 + 1));
+        b ^= (byte)(_random.Next() >> (int)(_index % 16));
         _index++;
         return b;
     }

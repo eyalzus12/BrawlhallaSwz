@@ -9,6 +9,8 @@ namespace BrawlhallaSwz;
 
 public static partial class SwzUtils
 {
+    private const int COPY_STREAM_BUFFER_SIZE = 81920;
+
     internal static uint CalculateKeyChecksum(uint key, SwzRandom rand)
     {
         uint checksum = 0x2DF4A1CDu;
@@ -23,7 +25,7 @@ public static partial class SwzUtils
     // why is this not a standard function?
     internal static long CopyStream(Stream source, Stream destination, long bytes)
     {
-        byte[] buffer = ArrayPool<byte>.Shared.Rent(81920);
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(COPY_STREAM_BUFFER_SIZE);
         try
         {
             long bytesRead = 0;
@@ -56,7 +58,7 @@ public static partial class SwzUtils
 
         static async ValueTask<long> Core(Stream source, Stream destination, long bytes, CancellationToken cancellationToken = default)
         {
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(81920);
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(COPY_STREAM_BUFFER_SIZE);
             try
             {
                 long bytesRead = 0;

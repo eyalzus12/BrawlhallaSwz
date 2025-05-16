@@ -79,10 +79,10 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         _intermediate.SetLength(0);
 
         uint checksum;
-        using (ZLibStream zLibStream = new(stream, CompressionLevel.SmallestSize, true))
-        using (SwzEncryptStream encryptor = new(zLibStream, _random, true))
+        using (SwzEncryptStream encryptor = new(_intermediate, _random, true))
         {
-            encryptor.CopyTo(_intermediate);
+            using (ZLibStream zLibStream = new(encryptor, CompressionLevel.SmallestSize, true))
+                stream.CopyTo(zLibStream);
             checksum = encryptor.Checksum;
         }
 
@@ -90,12 +90,16 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         if (compressedSize_ > uint.MaxValue) throw new OverflowException("Size of compressed file exceeds uint32 max");
 
         // write file data
+
+        // write compressed size
         uint compressedSize = (uint)compressedSize_ ^ compressedSizeSalt;
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, compressedSize);
         _stream.Write(_buffer);
+        // write decompressed size
         uint decompressedSize = (uint)decompressedSize_ ^ decompressedSizeSalt;
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, decompressedSize);
         _stream.Write(_buffer);
+        // write checksum
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, checksum);
         _stream.Write(_buffer);
         // write file
@@ -128,10 +132,10 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         _intermediate.SetLength(0);
 
         uint checksum;
-        using (SwzEncryptStream encryptor = new(stream, _random, true))
-        using (ZLibStream zLibStream = new(encryptor, CompressionLevel.SmallestSize, true))
+        using (SwzEncryptStream encryptor = new(_intermediate, _random, true))
         {
-            await zLibStream.CopyToAsync(_intermediate, cancellationToken).ConfigureAwait(false);
+            using (ZLibStream zLibStream = new(encryptor, CompressionLevel.SmallestSize, true))
+                await stream.CopyToAsync(zLibStream, cancellationToken).ConfigureAwait(false);
             checksum = encryptor.Checksum;
         }
 
@@ -139,15 +143,20 @@ public class SwzWriter : IDisposable, IAsyncDisposable
         if (compressedSize_ > uint.MaxValue) throw new OverflowException("Size of compressed file exceeds uint32 max");
 
         // write file data
+
+        // write compressed size
         uint compressedSize = (uint)compressedSize_ ^ compressedSizeSalt;
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, compressedSize);
         await _stream.WriteAsync(_buffer, cancellationToken).ConfigureAwait(false);
+        // write decompressed size
         uint decompressedSize = (uint)decompressedSize_ ^ decompressedSizeSalt;
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, decompressedSize);
         await _stream.WriteAsync(_buffer, cancellationToken).ConfigureAwait(false);
+        // write checksum
         BinaryPrimitives.WriteUInt32BigEndian(_buffer, checksum);
         await _stream.WriteAsync(_buffer, cancellationToken).ConfigureAwait(false);
         // write file
+        _intermediate.Position = 0;
         await _intermediate.CopyToAsync(_stream, cancellationToken).ConfigureAwait(false);
     }
 
@@ -164,21 +173,28 @@ public class SwzWriter : IDisposable, IAsyncDisposable
     {
         if (cancellationToken.IsCancellationRequested)
             return ValueTask.FromCanceled(cancellationToken);
-
         EnsureNotDisposed();
+        return Core();
 
-        byte[] bytes = Encoding.UTF8.GetBytes(content);
-        using MemoryStream ms = new(bytes);
-        return WriteFileCoreAsync(ms, cancellationToken);
+        async ValueTask Core()
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(content);
+            using MemoryStream ms = new(bytes);
+            await WriteFileCoreAsync(ms, cancellationToken);
+        }
     }
 
     public void Flush()
     {
+        EnsureNotDisposed();
         _stream.Flush();
     }
 
     public Task FlushAsync(CancellationToken cancellationToken = default)
     {
+        if (cancellationToken.IsCancellationRequested)
+            return Task.FromCanceled(cancellationToken);
+        EnsureNotDisposed();
         return _stream.FlushAsync(cancellationToken);
     }
 

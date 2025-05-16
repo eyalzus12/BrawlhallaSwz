@@ -16,7 +16,7 @@ public sealed class SwzDecryptStream : Stream
     private SwzRandom _random;
 
     public uint Checksum { get; private set; } = 0;
-    private int _index = -1;
+    private long _index = -1;
     private byte[] _buffer = null!;
 
     public SwzDecryptStream(Stream stream, SwzRandom random, bool leaveOpen = false)
@@ -189,8 +189,8 @@ public sealed class SwzDecryptStream : Stream
 
     private byte DecryptByte(byte b)
     {
-        b ^= (byte)(_random.Next() >> (_index % 16));
-        Checksum = b ^ BitOperations.RotateRight(Checksum, _index % 7 + 1);
+        b ^= (byte)(_random.Next() >> (int)(_index % 16));
+        Checksum = b ^ BitOperations.RotateRight(Checksum, (int)(_index % 7 + 1));
         ++_index;
         return b;
     }
